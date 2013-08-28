@@ -20,101 +20,245 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pygtk
-pygtk.require("2.0")
+pygtk.require ("2.0")
 import gtk
 import os
-import sys
+import ConfigParser
 
-LOGOUT_COMMAND = "openbox --exit"
+class Shutdown_Dialog:
 
-class ShutdownDialog:
-    def __init__(self):
-        iconsize = gtk.icon_size_register("64x64", 64, 64)
+  def __init__ (self):
 
-        self.window = gtk.Window()
-        self.window.set_decorated(False)
-        self.window.set_keep_above(True)
+    self.config_uri = os.path.expanduser ("~/.pygtk-shutdown")
+    self.window = None
+    self.frame = None
+    self.buttons_box = None
+    self.lock_button = None
+    self.cancel_button = None
+    self.halt_button = None
+    self.logout_button = None
+    self.restart_button = None
+    self.sleep_button = None
+    self.hibernate_button = None
+    self.show_cancel = True
+    self.vertical = False
+    self.lock_command = ""
+    self.logout_command = ""
+    self.sleep_command = ""
+    self.hibernate_command = ""
+    self.halt_command = ""
+    self.restart_command = ""
 
-        self.frame1 = gtk.Frame()
-        self.frame2 = gtk.Frame()
 
-        self.layoutBox = gtk.VBox(False, 5)
-        self.layoutBox.set_border_width(5)
-        self.buttonsBox1 = gtk.HBox(True, 5)
-        self.buttonsBox2 = gtk.HBox(True, 5)
-        self.buttonsBox1.set_border_width(5)
-        self.buttonsBox2.set_border_width(5)
-        self.cancelButtonAlignment = gtk.Alignment(1.0, 0.5)
+  def main (self):
+    """Creates the dialog"""
 
-        self.logoutButton = gtk.Button("Logout")
-        ico = gtk.Image()
-        ico.set_from_icon_name("gnome-logout", iconsize)
-        self.logoutButton.set_image(ico)
+    self.get_config ()
 
-        self.restartButton = gtk.Button("Restart")
-        ico = gtk.Image()
-        ico.set_from_icon_name("gnome-session-reboot", iconsize)
-        self.restartButton.set_image(ico)
+    iconsize = gtk.icon_size_register ("48x48", 48, 48)
 
-        self.haltButton = gtk.Button("Shutdown")
-        ico = gtk.Image()
-        ico.set_from_icon_name("gnome-shutdown", iconsize)
-        self.haltButton.set_image(ico)
+    self.window = gtk.Window ()
+    self.window.set_modal (True)
+    self.window.set_decorated (False)
+    self.window.set_keep_above (True)
+    self.window.connect ("key_press_event", self.on_key_press)
+    self.frame = gtk.Frame ()
 
-        self.cancelButton = gtk.Button(None, gtk.STOCK_CANCEL)
+    if self.vertical == True:
+      self.buttons_box = gtk.VBox (True)
+    else:
+      self.buttons_box = gtk.HBox (True)
 
-        self.buttonsBox1.pack_start(self.logoutButton)
-        self.buttonsBox2.pack_start(self.restartButton)
-        self.buttonsBox2.pack_start(self.haltButton)
-        self.cancelButtonAlignment.add(self.cancelButton)
-        self.frame1.add(self.buttonsBox1)
-        self.frame2.add(self.buttonsBox2)
-        self.layoutBox.pack_start(self.frame1)
-        self.layoutBox.pack_start(self.frame2)
-        self.layoutBox.pack_start(self.cancelButtonAlignment)
+    if self.show_cancel == True:
+      self.cancel_button = gtk.Button ("Cancel")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("dialog-cancel", iconsize)
+      self.cancel_button.set_image (ico)
+      self.buttons_box.pack_start (self.cancel_button)
+      self.cancel_button.connect ("clicked", self.close)
 
-        self.window.add(self.layoutBox)
+    if len (self.lock_command) > 0:
+      self.lock_button = gtk.Button ("Lock")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-lockscreen", iconsize)
+      self.lock_button.set_image (ico)
+      self.buttons_box.pack_start (self.lock_button)
+      self.lock_button.connect ("clicked", self.lock)
 
-        self.window.show_all()
+    if len (self.logout_command) > 0:
+      self.logout_button = gtk.Button ("Logout")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-session-logout", iconsize)
+      self.logout_button.set_image (ico)
+      self.buttons_box.pack_start (self.logout_button)
+      self.logout_button.connect ("clicked", self.logout)
 
-        self.window.set_gravity(gtk.gdk.GRAVITY_NORTH_WEST)
-        w, h = self.window.get_size()
-        self.window.move(gtk.gdk.screen_width() / 2 - w / 2,
-			gtk.gdk.screen_height() / 2 - h / 2)
+    if len (self.restart_command) > 0:
+      self.restart_button = gtk.Button ("Restart")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-session-reboot", iconsize)
+      self.restart_button.set_image (ico)
+      self.buttons_box.pack_start (self.restart_button)
+      self.restart_button.connect ("clicked", self.restart)
 
-        self.window.connect("delete-event", self.terminate)
-        self.cancelButton.connect("clicked", self.terminate)
+    if len (self.halt_command) > 0:
+      self.halt_button = gtk.Button ("Shutdown")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-session-halt", iconsize)
+      self.halt_button.set_image (ico)
+      self.buttons_box.pack_start (self.halt_button)
+      self.halt_button.connect ("clicked", self.shutdown)
 
-        self.logoutButton.connect("clicked", self.logout)
-        self.restartButton.connect("clicked", self.reboot)
-        self.haltButton.connect("clicked", self.shutdown)
+    if len (self.sleep_command) > 0:
+      self.sleep_button = gtk.Button ("Sleep")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-session-sleep", iconsize)
+      self.sleep_button.set_image (ico)
+      self.buttons_box.pack_start (self.sleep_button)
+      self.sleep_button.connect ("clicked", self.sleep)
 
-    def main(self):
-        gtk.main()
+    if len (self.hibernate_command) > 0:
+      self.hibernate_button = gtk.Button ("Hibernate")
+      ico = gtk.Image ()
+      ico.set_from_icon_name ("gnome-session-hibernate", iconsize)
+      self.hibernate_button.set_image (ico)
+      self.buttons_box.pack_start (self.hibernate_button)
+      self.hibernate_button.connect ("clicked", self.hibernate)
 
-    def terminate(self, widget = None, data = None):
-        gtk.main_quit()
+    self.frame.add (self.buttons_box)
 
-    def logout(self, widget = None, data = None):
-        os.system(LOGOUT_COMMAND)
-        gtk.main_quit()
+    self.window.add (self.frame)
+    self.window.show_all ()
+    self.window.set_gravity (gtk.gdk.GRAVITY_NORTH_WEST)
+    self.window.connect ("delete-event", self.close)
 
-    def shutdown(self, widget = None, data = None):
-        os.system("/usr/bin/gksudo \"/sbin/shutdown -h now\" &")
-        gtk.main_quit()
+    gtk.main ()
 
-    def reboot(self, widget = None, data = None):
-        os.system("/usr/bin/gksudo \"/sbin/shutdown -r now\" &")
-        gtk.main_quit()
 
-def main():
-    shutdownDialog = ShutdownDialog()
-    shutdownDialog.main()
+  def get_config (self):
+    """Loads in the configuration options"""
+
+    config = ConfigParser.ConfigParser ()
+    config.read (self.config_uri)
+
+    options = ["show_cancel", "vertical", "lock_command", "logout_command", "sleep_command", "hibernate_command", "halt_command", "restart_command"]
+
+    for option in options:
+
+      if config.has_option ("config", option) == False:
+        continue
+
+      option_type = type (getattr (self, option))
+
+      if option_type == bool:
+        option_value = config.getboolean ("config", option)
+      else:
+        option_value = config.get ("config", option)
+
+      setattr (self, option, option_value)
+
+
+  def close (self, widget = None, data = None):
+    """Closes the dialog"""
+
+    gtk.main_quit ()
+
+
+  def lock (self, widget = None, data = None):
+    """Locks the session"""
+
+    self.run (self.lock_command)
+
+
+  def logout (self, widget = None, data = None):
+    """Closes the session"""
+
+    self.run (self.logout_command)
+
+
+  def shutdown (self, widget = None, data = None):
+    """Shuts down the computer"""
+
+    self.run (self.halt_command)
+
+
+  def restart (self, widget = None, data = None):
+    """Restarts the computer"""
+
+    self.run (self.restart_command)
+
+
+  def sleep (self, widget = None, data = None):
+    """Sleeps the computer"""
+
+    self.run (self.sleep_command)
+
+
+  def hibernate (self, widget = None, data = None):
+    """Hibernates the computer"""
+
+    self.run (self.hibernate_command)
+
+
+  def focus_next (self):
+    """Focuses the next button"""
+
+    self.buttons_box.child_focus (gtk.DIR_TAB_FORWARD)
+
+
+  def focus_previous (self):
+    """Focuses the previous button"""
+
+    self.buttons_box.child_focus (gtk.DIR_TAB_BACKWARD)
+
+
+  def focus_first (self):
+    """Focuses the first button"""
+
+    try:
+      self.buttons_box.get_children ()[0].grab_focus ()
+    except IndexError:
+      pass
+
+
+  def focus_last (self):
+    """Focuses the last button"""
+
+    try:
+      self.buttons_box.get_children ()[-1].grab_focus ()
+    except IndexError:
+      pass
+
+
+  def on_key_press (self, widget, event):
+    """Handles key-press events"""
+
+    keyname = gtk.gdk.keyval_name (event.keyval)
+
+    if (event.state & gtk.gdk.CONTROL_MASK and keyname == "g") or keyname == "Escape":
+      self.close ()
+    elif event.state & gtk.gdk.CONTROL_MASK and (keyname == "n" or keyname == "f"):
+      self.focus_next ()
+    elif event.state & gtk.gdk.CONTROL_MASK and (keyname == "p" or keyname == "b"):
+      self.focus_previous ()
+    elif event.state & gtk.gdk.CONTROL_MASK and keyname == "a":
+      self.focus_first ()
+    elif event.state & gtk.gdk.CONTROL_MASK and keyname == "e":
+      self.focus_last ()
+    elif keyname == "Home":
+      self.focus_first ()
+    elif keyname == "End":
+      self.focus_last ()
+
+
+  def run (self, command):
+    """Runs the given command"""
+
+    self.close ()
+    os.system (command)
+
 
 if __name__ == "__main__":
-    LOGOUT_COMMAND = os.getenv("LOGOUT_COMMAND", LOGOUT_COMMAND)
 
-    if len(sys.argv) > 1:
-        LOGOUT_COMMAND = " ".join(sys.argv[1:])
-
-    main()
+  dialog = Shutdown_Dialog ()
+  dialog.main ()

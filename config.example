@@ -1,0 +1,6 @@
+[config]
+show_cancel = False
+lock_command = xtrlock &
+logout_command = echo 'awesome.quit()' | awesome-client
+halt_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Stop &
+restart_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Restart &
