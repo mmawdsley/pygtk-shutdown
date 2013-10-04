@@ -1,6 +1,9 @@
 [config]
 show_cancel = False
-lock_command = xtrlock &
+lock_command = xtrlock
 logout_command = echo 'awesome.quit()' | awesome-client
-halt_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Stop &
-restart_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Restart &
+sleep_command = sudo pm-suspend
+hibernate_command = sudo pm-hibernate
+halt_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Stop
+restart_command = dbus-send --system --print-reply --dest=org.freedesktop.ConsoleKit /org/freedesktop/ConsoleKit/Manager org.freedesktop.ConsoleKit.Manager.Restart
+resume_command = echo 'config.restart()' | awesome-client

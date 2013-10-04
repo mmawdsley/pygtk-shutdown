@@ -23,6 +23,7 @@ import pygtk
 pygtk.require ("2.0")
 import gtk
 import os
+import subprocess
 import ConfigParser
 
 class Shutdown_Dialog:
@@ -46,6 +47,7 @@ class Shutdown_Dialog:
     self.logout_command = ""
     self.sleep_command = ""
     self.hibernate_command = ""
+    self.resume_command = ""
     self.halt_command = ""
     self.restart_command = ""
 
@@ -130,7 +132,7 @@ class Shutdown_Dialog:
     self.window.add (self.frame)
     self.window.show_all ()
     self.window.set_gravity (gtk.gdk.GRAVITY_NORTH_WEST)
-    self.window.connect ("delete-event", self.close)
+    self.window.connect ("delete_event", self.close)
 
     gtk.main ()
 
@@ -141,7 +143,11 @@ class Shutdown_Dialog:
     config = ConfigParser.ConfigParser ()
     config.read (self.config_uri)
 
-    options = ["show_cancel", "vertical", "lock_command", "logout_command", "sleep_command", "hibernate_command", "halt_command", "restart_command"]
+    options = [
+      "show_cancel", "vertical", "lock_command", "logout_command",
+      "sleep_command", "hibernate_command", "halt_command",
+      "restart_command", "resume_command"
+    ]
 
     for option in options:
 
@@ -161,43 +167,56 @@ class Shutdown_Dialog:
   def close (self, widget = None, data = None):
     """Closes the dialog"""
 
+    self.window.hide ()
     gtk.main_quit ()
+
+    while gtk.events_pending ():
+      gtk.main_iteration (False)
 
 
   def lock (self, widget = None, data = None):
     """Locks the session"""
 
-    self.run (self.lock_command)
+    self.run_command (self.lock_command)
 
 
   def logout (self, widget = None, data = None):
     """Closes the session"""
 
-    self.run (self.logout_command)
+    self.run_command (self.logout_command)
 
 
   def shutdown (self, widget = None, data = None):
     """Shuts down the computer"""
 
-    self.run (self.halt_command)
+    self.run_command (self.halt_command)
 
 
   def restart (self, widget = None, data = None):
     """Restarts the computer"""
 
-    self.run (self.restart_command)
+    self.run_command (self.restart_command)
 
 
   def sleep (self, widget = None, data = None):
     """Sleeps the computer"""
 
-    self.run (self.sleep_command)
+    self.run_command (self.sleep_command)
+    self.resume ()
 
 
   def hibernate (self, widget = None, data = None):
     """Hibernates the computer"""
 
-    self.run (self.hibernate_command)
+    self.run_command (self.hibernate_command)
+    self.resume ()
+
+
+  def resume (self):
+    """Runs the resume command"""
+
+    if len (self.resume_command) > 0:
+      self.run_command (self.resume_command)
 
 
   def focus_next (self):
@@ -251,11 +270,17 @@ class Shutdown_Dialog:
       self.focus_last ()
 
 
-  def run (self, command):
-    """Runs the given command"""
+  def hide (self):
+    """Hides the window"""
+
+    self.window.hide ()
+
+
+  def run_command (self, command):
+    """Runs the given command and stores the process for later"""
 
     self.close ()
-    os.system (command)
+    subprocess.call (command, shell=True)
 
 
 if __name__ == "__main__":
