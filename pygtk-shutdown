@@ -167,7 +167,8 @@ class Shutdown_Dialog:
   def close (self, widget = None, data = None):
     """Closes the dialog"""
 
-    self.window.hide ()
+    self.hide ()
+
     gtk.main_quit ()
 
     while gtk.events_pending ():
