@@ -25,149 +25,126 @@ import gtk
 import os
 import subprocess
 import ConfigParser
+from threading import Thread
 
 class Shutdown_Dialog:
 
   def __init__ (self):
 
-    self.config_uri = os.path.expanduser ("~/.pygtk-shutdown")
-    self.window = None
-    self.frame = None
-    self.buttons_box = None
-    self.lock_button = None
-    self.cancel_button = None
-    self.halt_button = None
-    self.logout_button = None
-    self.restart_button = None
-    self.sleep_button = None
-    self.hibernate_button = None
-    self.show_cancel = True
-    self.vertical = False
-    self.lock_command = ""
-    self.logout_command = ""
-    self.sleep_command = ""
-    self.hibernate_command = ""
-    self.resume_command = ""
-    self.halt_command = ""
-    self.restart_command = ""
+    self._config_uri = os.path.expanduser ("~/.pygtk-shutdown")
+    self._window = None
+    self._buttons_box = None
+    self._lock_button = None
+    self._cancel_button = None
+    self._halt_button = None
+    self._logout_button = None
+    self._restart_button = None
+    self._sleep_button = None
+    self._hibernate_button = None
+    self._threads = []
+    self._config = {
+      "show_cancel" : True,
+      "vertical" : False,
+      "lock_command" : "",
+      "logout_command" : "",
+      "sleep_command" : "",
+      "hibernate_command" : "",
+      "halt_command" : "",
+      "restart_command" : "",
+      "resume_command" : ""
+    }
 
 
   def main (self):
     """Creates the dialog"""
 
-    self.get_config ()
+    self._get_config ()
 
     iconsize = gtk.icon_size_register ("48x48", 48, 48)
 
-    self.window = gtk.Window ()
-    self.window.set_modal (True)
-    self.window.set_decorated (False)
-    self.window.set_keep_above (True)
-    self.window.connect ("key_press_event", self.on_key_press)
-    self.frame = gtk.Frame ()
+    self._window = gtk.Window ()
+    self._window.set_modal (True)
+    self._window.set_decorated (False)
+    self._window.set_keep_above (True)
+    self._window.connect ("key_press_event", self._on_key_press)
 
-    if self.vertical == True:
-      self.buttons_box = gtk.VBox (True)
+
+    if self._config["vertical"] == True:
+      self._buttons_box = gtk.VBox (True)
     else:
-      self.buttons_box = gtk.HBox (True)
+      self._buttons_box = gtk.HBox (True)
 
-    if self.show_cancel == True:
-      self.cancel_button = gtk.Button ("Cancel")
+    if self._config["show_cancel"] == True:
+      self._cancel_button = gtk.Button ("Cancel")
       ico = gtk.Image ()
       ico.set_from_icon_name ("dialog-cancel", iconsize)
-      self.cancel_button.set_image (ico)
-      self.buttons_box.pack_start (self.cancel_button)
-      self.cancel_button.connect ("clicked", self.close)
+      self._cancel_button.set_image (ico)
+      self._buttons_box.pack_start (self._cancel_button)
+      self._cancel_button.connect ("clicked", self.close)
 
-    if len (self.lock_command) > 0:
-      self.lock_button = gtk.Button ("Lock")
+    if len (self._config["lock_command"]) > 0:
+      self._lock_button = gtk.Button ("Lock")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-lockscreen", iconsize)
-      self.lock_button.set_image (ico)
-      self.buttons_box.pack_start (self.lock_button)
-      self.lock_button.connect ("clicked", self.lock)
+      self._lock_button.set_image (ico)
+      self._buttons_box.pack_start (self._lock_button)
+      self._lock_button.connect ("clicked", self.lock)
 
-    if len (self.logout_command) > 0:
-      self.logout_button = gtk.Button ("Logout")
+    if len (self._config["logout_command"]) > 0:
+      self._logout_button = gtk.Button ("Logout")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-session-logout", iconsize)
-      self.logout_button.set_image (ico)
-      self.buttons_box.pack_start (self.logout_button)
-      self.logout_button.connect ("clicked", self.logout)
+      self._logout_button.set_image (ico)
+      self._buttons_box.pack_start (self._logout_button)
+      self._logout_button.connect ("clicked", self.logout)
 
-    if len (self.restart_command) > 0:
-      self.restart_button = gtk.Button ("Restart")
+    if len (self._config["restart_command"]) > 0:
+      self._restart_button = gtk.Button ("Restart")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-session-reboot", iconsize)
-      self.restart_button.set_image (ico)
-      self.buttons_box.pack_start (self.restart_button)
-      self.restart_button.connect ("clicked", self.restart)
+      self._restart_button.set_image (ico)
+      self._buttons_box.pack_start (self._restart_button)
+      self._restart_button.connect ("clicked", self.restart)
 
-    if len (self.halt_command) > 0:
-      self.halt_button = gtk.Button ("Shutdown")
+    if len (self._config["halt_command"]) > 0:
+      self._halt_button = gtk.Button ("Shutdown")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-session-halt", iconsize)
-      self.halt_button.set_image (ico)
-      self.buttons_box.pack_start (self.halt_button)
-      self.halt_button.connect ("clicked", self.shutdown)
+      self._halt_button.set_image (ico)
+      self._buttons_box.pack_start (self._halt_button)
+      self._halt_button.connect ("clicked", self.shutdown)
 
-    if len (self.sleep_command) > 0:
-      self.sleep_button = gtk.Button ("Sleep")
+    if len (self._config["sleep_command"]) > 0:
+      self._sleep_button = gtk.Button ("Sleep")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-session-sleep", iconsize)
-      self.sleep_button.set_image (ico)
-      self.buttons_box.pack_start (self.sleep_button)
-      self.sleep_button.connect ("clicked", self.sleep)
+      self._sleep_button.set_image (ico)
+      self._buttons_box.pack_start (self._sleep_button)
+      self._sleep_button.connect ("clicked", self.sleep)
 
-    if len (self.hibernate_command) > 0:
-      self.hibernate_button = gtk.Button ("Hibernate")
+    if len (self._config["hibernate_command"]) > 0:
+      self._hibernate_button = gtk.Button ("Hibernate")
       ico = gtk.Image ()
       ico.set_from_icon_name ("gnome-session-hibernate", iconsize)
-      self.hibernate_button.set_image (ico)
-      self.buttons_box.pack_start (self.hibernate_button)
-      self.hibernate_button.connect ("clicked", self.hibernate)
+      self._hibernate_button.set_image (ico)
+      self._buttons_box.pack_start (self._hibernate_button)
+      self._hibernate_button.connect ("clicked", self.hibernate)
 
-    self.frame.add (self.buttons_box)
+    frame = gtk.Frame ()
+    frame.add (self._buttons_box)
 
-    self.window.add (self.frame)
-    self.window.show_all ()
-    self.window.set_gravity (gtk.gdk.GRAVITY_NORTH_WEST)
-    self.window.connect ("delete_event", self.close)
+    self._window.add (frame)
+    self._window.show_all ()
+    self._window.set_gravity (gtk.gdk.GRAVITY_NORTH_WEST)
+    self._window.connect ("delete_event", self.close)
 
     gtk.main ()
-
-
-  def get_config (self):
-    """Loads in the configuration options"""
-
-    config = ConfigParser.ConfigParser ()
-    config.read (self.config_uri)
-
-    options = [
-      "show_cancel", "vertical", "lock_command", "logout_command",
-      "sleep_command", "hibernate_command", "halt_command",
-      "restart_command", "resume_command"
-    ]
-
-    for option in options:
-
-      if config.has_option ("config", option) == False:
-        continue
-
-      option_type = type (getattr (self, option))
-
-      if option_type == bool:
-        option_value = config.getboolean ("config", option)
-      else:
-        option_value = config.get ("config", option)
-
-      setattr (self, option, option_value)
 
 
   def close (self, widget = None, data = None):
     """Closes the dialog"""
 
-    self.hide ()
+    self._window.hide ()
 
     gtk.main_quit ()
 
@@ -178,79 +155,116 @@ class Shutdown_Dialog:
   def lock (self, widget = None, data = None):
     """Locks the session"""
 
-    self.run_command (self.lock_command)
+    self.close ()
+    self._run (self._config["lock_command"])
+    self._wait ()
 
 
   def logout (self, widget = None, data = None):
     """Closes the session"""
 
-    self.run_command (self.logout_command)
+    self.close ()
+    self._run (self._config["logout_command"])
+    self._wait ()
 
 
   def shutdown (self, widget = None, data = None):
     """Shuts down the computer"""
 
-    self.run_command (self.halt_command)
+    self.close ()
+    self._run (self._config["halt_command"])
 
 
   def restart (self, widget = None, data = None):
     """Restarts the computer"""
 
-    self.run_command (self.restart_command)
+    self.close ()
+    self._run (self._config["restart_command"])
 
 
   def sleep (self, widget = None, data = None):
     """Sleeps the computer"""
 
-    self.run_command (self.sleep_command)
-    self.resume ()
+    self.close ()
+
+    self._run (self._config["lock_command"])
+    self._run (self._config["sleep_command"], self._config["resume_command"])
+
+    self._wait ()
 
 
   def hibernate (self, widget = None, data = None):
     """Hibernates the computer"""
 
-    self.run_command (self.hibernate_command)
-    self.resume ()
+    self.close ()
+
+    self._run (self._config["hibernate_command"])
+    self._run (self._config["resume_command"])
+
+    self._wait ()
 
 
   def resume (self):
     """Runs the resume command"""
 
-    if len (self.resume_command) > 0:
-      self.run_command (self.resume_command)
+    self._run (self._config["resume_command"])
 
 
-  def focus_next (self):
+  def _get_config (self):
+    """Loads in the configuration options"""
+
+    config = ConfigParser.ConfigParser ()
+    config.read (self._config_uri)
+
+    for option in self._config:
+
+      if config.has_option ("config", option) == False:
+        continue
+
+      if type (self._config[option]) == bool:
+        self._config[option] = config.getboolean ("config", option)
+      else:
+        self._config[option] = config.get ("config", option)
+
+
+  def _wait (self):
+    """Waits for the threads to finish"""
+
+    for thread in self._threads:
+      thread.join ()
+
+
+  def _focus_next (self):
     """Focuses the next button"""
 
-    self.buttons_box.child_focus (gtk.DIR_TAB_FORWARD)
+    self._buttons_box.child_focus (gtk.DIR_TAB_FORWARD)
 
 
-  def focus_previous (self):
+  def _focus_previous (self):
     """Focuses the previous button"""
 
-    self.buttons_box.child_focus (gtk.DIR_TAB_BACKWARD)
+    self._buttons_box.child_focus (gtk.DIR_TAB_BACKWARD)
 
 
-  def focus_first (self):
+  def _focus_first (self):
     """Focuses the first button"""
 
     try:
-      self.buttons_box.get_children ()[0].grab_focus ()
+      self._buttons_box.get_children ()[0].grab_focus ()
     except IndexError:
       pass
 
 
-  def focus_last (self):
+  def _focus_last (self):
     """Focuses the last button"""
 
     try:
-      self.buttons_box.get_children ()[-1].grab_focus ()
+      self._buttons_box.get_children ()[-1].grab_focus ()
     except IndexError:
       pass
 
 
-  def on_key_press (self, widget, event):
+  def _on_key_press (self, widget, event):
     """Handles key-press events"""
 
     keyname = gtk.gdk.keyval_name (event.keyval)
@@ -258,30 +272,35 @@ class Shutdown_Dialog:
     if (event.state & gtk.gdk.CONTROL_MASK and keyname == "g") or keyname == "Escape":
       self.close ()
     elif event.state & gtk.gdk.CONTROL_MASK and (keyname == "n" or keyname == "f"):
-      self.focus_next ()
+      self._focus_next ()
     elif event.state & gtk.gdk.CONTROL_MASK and (keyname == "p" or keyname == "b"):
-      self.focus_previous ()
+      self._focus_previous ()
     elif event.state & gtk.gdk.CONTROL_MASK and keyname == "a":
-      self.focus_first ()
+      self._focus_first ()
     elif event.state & gtk.gdk.CONTROL_MASK and keyname == "e":
-      self.focus_last ()
+      self._focus_last ()
     elif keyname == "Home":
-      self.focus_first ()
+      self._focus_first ()
     elif keyname == "End":
-      self.focus_last ()
+      self._focus_last ()
 
 
-  def hide (self):
-    """Hides the window"""
+  def _run (self, *commands):
+    """Runs the given commands in a thread"""
 
-    self.window.hide ()
+    t = Thread (None, self._command_thread, None, [commands])
+    t.start ()
+
+    self._threads.append (t)
 
 
-  def run_command (self, command):
-    """Runs the given command and stores the process for later"""
+  def _command_thread (self, commands):
+    """Runs the commands one after the other"""
 
-    self.close ()
-    subprocess.call (command, shell=True)
+    for command in commands:
+
+      if len (command) > 0:
+        subprocess.call (command, shell=True)
 
 
 if __name__ == "__main__":
